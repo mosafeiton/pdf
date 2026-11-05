@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מציג מאמר אקדמי</title>
+
+<style>
+:root {
+    --accent: #1769aa;
+    --surface: #fff;
+    --canvas: #e9e9ed;
+    --field: #f1f1f4;
+    --border: #ccc;
+    --ink: #222;
+    --muted: #555;
+    --danger: #b3261e;
+    --viewer-gap: 10px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+html {
+    height: 100%;
+}
+
+/* גובה דינמי: סרגל הכתובת בניידים לא יסתיר את תחתית המציג */
+body {
+    margin: 0;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: Arial, sans-serif;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ---------- סרגל הכלים ---------- */
+
+#controls {
+    flex-shrink: 0;
+    position: relative;
+    z-index: 100;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: var(--surface);
+    box-shadow: 0 2px 6px #0002;
+}
+
+.group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+button,
+.download {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 36px;
+    border: 0;
+    border-radius: 5px;
+    padding: 0 13px;
+    font: inherit;
+    font-size: 15px;
+    line-height: 1;
+    background: var(--accent);
+    color: #fff;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+button:disabled {
+    background: #aaa;
+    cursor: not-allowed;
+}
+
+.icon {
+    width: 18px;
+    height: 18px;
+    flex: none;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+#page-info {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 15px;
+    white-space: nowrap;
+}
+
+input,
+select {
+    font: inherit;
+    font-size: 14px;
+    color: inherit;
+}
+
+#page-input {
+    width: 3.4em;
+    height: 36px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+    text-align: center;
+}
+
+#zoom-select {
+    height: 36px;
+    max-width: 150px;
+    padding: 0 6px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface);
+}
+
+.search-box {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    min-height: 36px;
+    padding: 0 4px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--field);
+}
+
+.search-box.not-found {
+    border-color: var(--danger);
+}
+
+.search-box input {
+    width: 150px;
+    min-width: 0;
+    padding: 6px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+}
+
+.search-box:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+#search-status {
+    color: var(--muted);
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.search-box.not-found #search-status {
+    color: var(--danger);
+}
+
+.search-btn {
+    min-height: 30px;
+    min-width: 30px;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+}
+
+.search-btn:disabled {
+    background: none;
+    color: #aaa;
+}
+
+.narrow-only {
+    display: none;
+}
+
+/* ---------- אזור התצוגה ---------- */
+
+#viewerArea {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+
+/* direction: ltr - בהגדלה העמוד נפתח מקצהו השמאלי ואפשר לגלול לשני הצדדים.
+   touch-action - צביטה תגדיל את העמוד בלבד, ולא את סרגל הכלים. */
+#viewerContainer {
+    position: absolute;
+    inset: var(--viewer-gap) 0 0;
+    overflow: auto;
+    scrollbar-gutter: stable;
+    direction: ltr;
+    outline: 0;
+    touch-action: pan-x pan-y;
+}
+
+#viewer .page {
+    margin: 0 auto;
+    box-shadow: 0 2px 9px #0003;
+}
+
+#viewer.continuous .page {
+    margin-bottom: var(--viewer-gap);
+}
+
+#message {
+    position: absolute;
+    top: 25px;
+    left: 50%;
+    z-index: 10;
+    width: min(90%, 420px);
+    transform: translateX(-50%);
+    padding: 20px;
+    color: #444;
+    font-size: 16px;
+    text-align: center;
+}
+
+#message progress {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin-top: 12px;
+    accent-color: var(--accent);
+}
+
+#message.error {
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 2px 9px #0003;
+}
+
+#message a {
+    display: block;
+    margin-top: 12px;
+    color: var(--accent);
+}
+
+/* ---------- תוכן העניינים ---------- */
+
+#outline-panel {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    z-index: 20;
+    width: min(340px, 88%);
+    overflow-y: auto;
+    padding: 8px;
+    background: var(--surface);
+    box-shadow: 0 0 12px #0004;
+}
+
+#outline-panel ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+#outline-panel ul ul {
+    padding-inline-start: 16px;
+}
+
+#outline-panel button {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    padding: 8px;
+    background: none;
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.3;
+    text-align: start;
+}
+
+#outline-panel button:hover {
+    background: var(--field);
+}
+
+#outline-panel > ul > li > button {
+    font-weight: bold;
+}
+
+/* ---------- טלפונים, כולל טלפון במצב אופקי ---------- */
+
+@media (max-width: 640px), (max-height: 500px) {
+    :root {
+        --viewer-gap: 0px;
+    }
+
+    #controls {
+        gap: 6px;
+        padding: 6px;
+    }
+
+    .wide-only,
+    #zoom-select {
+        display: none;
+    }
+
+    .narrow-only {
+        display: inline;
+    }
+
+    button,
+    .download {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 0 10px;
+        font-size: 14px;
+    }
+
+    #page-input {
+        width: 2.8em;
+        height: 40px;
+    }
+
+    .search-box {
+        flex: 1 1 180px;
+        min-width: 0;
+        min-height: 40px;
+    }
+
+    /* גודל 16 פיקסלים מונע הגדלה אוטומטית של הדף ב-iOS בעת הקלדה */
+    .search-box input,
+    #page-input {
+        font-size: 16px;
+    }
+
+    .search-box input {
+        flex: 1;
+        width: 0;
+    }
+}
+
+@media (max-width: 340px) {
+    #controls {
+        gap: 4px;
+    }
+
+    button,
+    .download {
+        min-width: 36px;
+        padding: 0 6px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="i-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6"/></symbol>
+    <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+    <symbol id="i-save" viewBox="0 0 24 24"><path d="M12 4v11m-5-5 5 5 5-5M5 20h14"/></symbol>
+    <symbol id="i-pages" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="8" rx="1"/><rect x="6" y="13" width="12" height="8" rx="1"/></symbol>
+</svg>
+
+<div id="controls" role="toolbar" aria-label="כלי המסמך">
+    <button id="outline-toggle" type="button" title="תוכן עניינים" aria-label="תוכן עניינים"
+            aria-expanded="false" aria-controls="outline-panel" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg>
+    </button>
+
+    <div class="group">
+        <button id="prev" type="button" title="העמוד הקודם" disabled>הקודם</button>
+
+        <span id="page-info">
+            <span class="wide-only">עמוד</span>
+            <input id="page-input" type="text" inputmode="numeric" enterkeyhint="go" autocomplete="off"
+                   dir="ltr" value="1" aria-label="מספר עמוד" disabled>
+            <span class="wide-only">מתוך</span>
+            <span class="narrow-only">/</span>
+            <span id="total-pages">...</span>
+        </span>
+
+        <button id="next" type="button" title="העמוד הבא" disabled>הבא</button>
+    </div>
+
+    <div class="group">
+        <button id="zoom-out" type="button" title="הקטנה" aria-label="הקטנה" disabled>−</button>
+        <select id="zoom-select" title="רמת זום" aria-label="רמת זום" disabled>
+            <option value="auto">התאמה אוטומטית</option>
+            <option value="page-width">רוחב העמוד</option>
+            <option value="page-fit">עמוד שלם</option>
+            <option id="zoom-custom" value="custom" hidden disabled></option>
+            <option value="0.75">75%</option>
+            <option value="1">100%</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+            <option value="3">300%</option>
+        </select>
+        <button id="zoom-in" type="button" title="הגדלה" aria-label="הגדלה" disabled>+</button>
+    </div>
+
+    <button id="scroll-mode" type="button" disabled>
+        <svg class="icon narrow-only" aria-hidden="true"><use href="#i-pages"/></svg>
+        <span id="scroll-mode-label" class="wide-only">גלילה רציפה</span>
+    </button>
+
+    <div class="search-box" id="search-box" role="search">
+        <input id="search-input" type="search" placeholder="חיפוש במסמך..." aria-label="חיפוש במסמך"
+               enterkeyhint="search" autocomplete="off" disabled>
+        <span id="search-status" role="status"></span>
+        <button id="search-prev" class="search-btn" type="button" title="התוצאה הקודמת"
+                aria-label="התוצאה הקודמת" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-up"/></svg>
+        </button>
+        <button id="search-next" class="search-btn" type="button" title="התוצאה הבאה"
+                aria-label="התוצאה הבאה" disabled>
+            <svg class="icon" aria-hidden="true"><use href="#i-down"/></svg>
+        </button>
+    </div>
+
+    <!-- זהו המקום היחיד שבו מוגדרת כתובת הקובץ -->
+    <a id="download" class="download" href="001.pdf" download aria-label="הורדת PDF">
+        <svg class="icon narrow-only" aria-hidden="true"><use href="#i-save"/></svg>
+        <span class="wide-only">הורדת PDF</span>
+    </a>
+</div>
+
+<div id="viewerArea">
+    <nav id="outline-panel" aria-label="תוכן עניינים" hidden></nav>
+
+    <div id="message" role="status">
+        <span id="message-text">טוען את המאמר...</span>
+        <progress id="load-progress"></progress>
+        <noscript>כדי לצפות במאמר יש לאפשר JavaScript, או להוריד את הקובץ מהסרגל למעלה.</noscript>
+    </div>
+
+    <div id="viewerContainer" tabindex="0">
+        <div id="viewer" class="pdfViewer"></div>
+    </div>
+</div>
+
+<script type="module">
+
+// ---------- הגדרות ----------
+
+// גרסה נעולה. לא לבחור גרסה בטווח 5.6.83 עד 6.2.108 (לא כולל): הוא פגיע ל-CVE-2026-16633.
+const PDFJS_VERSION = "6.4.299";
+
+// המקור השני משמש גיבוי. לאירוח עצמי: להעתיק את חבילת pdfjs-dist לאתר ולרשום כאן את הנתיב אליה.
+const PDFJS_SOURCES = [
+    `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}`,
+    `https://unpkg.com/pdfjs-dist@${PDFJS_VERSION}`
+];
+
+const DEFAULT_ZOOM = "auto";      // רוחב המסך בטלפון, ועד 125% במסך גדול
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 3;
+const ZOOM_STEP = 1.2;
+const START_CONTINUOUS = false;   // true = פתיחה בגלילה רציפה במקום עמוד בודד
+const REDRAW_DELAY = 250;         // המתנה לפני ציור מחדש בזמן צביטה וגלגלת (אלפיות שנייה)
+
+// ---------- רכיבי הממשק ----------
+
+const $ = (id) => document.getElementById(id);
+
+const area = $("viewerArea");
+const container = $("viewerContainer");
+const viewerElement = $("viewer");
+const message = $("message");
+const messageText = $("message-text");
+const loadProgress = $("load-progress");
+const pageInput = $("page-input");
+const totalPagesText = $("total-pages");
+const prevButton = $("prev");
+const nextButton = $("next");
+const zoomInButton = $("zoom-in");
+const zoomOutButton = $("zoom-out");
+const zoomSelect = $("zoom-select");
+const zoomCustom = $("zoom-custom");
+const scrollModeButton = $("scroll-mode");
+const scrollModeLabel = $("scroll-mode-label");
+const searchBox = $("search-box");
+const searchInput = $("search-input");
+const searchStatus = $("search-status");
+const searchPrevButton = $("search-prev");
+const searchNextButton = $("search-next");
+const outlineToggle = $("outline-toggle");
+const outlinePanel = $("outline-panel");
+
+const PDF_URL = $("download").getAttribute("href");
+
+// אחסון מקומי עלול להיות חסום (למשל בגלישה פרטית), ואז פשוט לא נזכור דבר
+const store = {
+    get(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch {
+            return null;
+        }
+    },
+    set(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch {
+            // אין מה לעשות
+        }
+    }
+};
+
+// ---------- הודעות שגיאה ----------
+
+function describeError(error) {
+    switch (error?.name) {
+        case "PasswordException":
+            return "המאמר מוגן בסיסמה ולא ניתן להציג אותו כאן.";
+        case "InvalidPDFException":
+            return "הקובץ פגום או שאינו קובץ PDF תקין.";
+        case "ResponseException":
+            if (error.status === 404) {
+                return "קובץ ה-PDF לא נמצא בשרת.";
+            }
+            break;
+    }
+    // דפדפן לא מאפשר לדף לקרוא קובץ מאתר אחר, אלא אם השרת של הקובץ מתיר זאת (CORS)
+    if (new URL(PDF_URL, location.href).origin !== location.origin) {
+        return "הדפדפן חסם את קריאת הקובץ מאתר אחר. יש לפתוח את המציג מאותו אתר שבו נמצא ה-PDF.";
+    }
+    return "לא ניתן לטעון את המאמר. ודא שקובץ ה-PDF קיים בשרת.";
+}
+
+function showError(text) {
+    message.hidden = false;
+    message.classList.add("error");
+    messageText.textContent = text;
+    loadProgress.hidden = true;
+
+    // הקורא תמיד יוכל לקבל את המאמר, גם כשהמציג עצמו נכשל
+    const link = document.createElement("a");
+    link.href = PDF_URL;
+    link.download = "";
+    link.textContent = "הורדת המאמר";
+    message.append(link);
+}
+
+// ---------- טעינת הספרייה ----------
+
+function loadStylesheet(href) {
+    return new Promise((resolve, reject) => {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = href;
+        link.onload = resolve;
+        link.onerror = () => reject(new Error(`Failed to load ${href}`));
+        document.head.prepend(link);
+    });
+}
+
+// משתמשים בגרסת legacy: הגרסה הרגילה מיועדת לדפדפנים העדכניים ביותר בלבד.
+// הטעינה דינמית, כדי שתקלה ב-CDN תציג הודעה במקום "טוען..." לנצח.
+// הסדר חשוב: pdf_viewer קורא את pdfjsLib מ-globalThis.
+async function loadLibraries() {
+    for (const base of PDFJS_SOURCES) {
+        try {
+            await loadStylesheet(`${base}/legacy/web/pdf_viewer.css`);
+            const pdfjsLib = await import(`${base}/legacy/build/pdf.min.mjs`);
+            const pdfjsViewer = await import(`${base}/legacy/web/pdf_viewer.mjs`);
+            return { base, pdfjsLib, pdfjsViewer };
+        } catch (error) {
+            console.warn(`PDF.js failed to load from ${base}`, error);
+        }
+    }
+    throw new Error("PDF.js could not be loaded");
+}
+
+// ---------- המציג ----------
+
+async function main() {
+    const { base, pdfjsLib, pdfjsViewer } = await loadLibraries();
+    const { EventBus, FindState, LinkTarget, PDFFindController, PDFHistory,
+            PDFLinkService, PDFViewer, ScrollMode } = pdfjsViewer;
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `${base}/legacy/build/pdf.worker.min.mjs`;
+
+    const eventBus = new EventBus();
+
+    // ignoreDestinationZoom - מעבר להפניה במאמר לא ישנה את רמת הזום של הקורא
+    const pdfLinkService = new PDFLinkService({
+        eventBus,
+        externalLinkTarget: LinkTarget.BLANK,
+        externalLinkRel: "noopener noreferrer nofollow",
+        ignoreDestinationZoom: true
+    });
+
+    const pdfFindController = new PDFFindController({
+        eventBus,
+        linkService: pdfLinkService
+    });
+
+    // היסטוריה: כפתור "אחורה" בדפדפן חוזר מהפניה לנקודה שבה הקורא עצר
+    const pdfHistory = new PDFHistory({
+        eventBus,
+        linkService: pdfLinkService
+    });
+
+    // PDFViewer תומך בשני מצבי הגלילה. removePageBorders - התאמה מדויקת לרוחב המסך.
+    const pdfViewer = new PDFViewer({
+        container,
+        viewer: viewerElement,
+        eventBus,
+        linkService: pdfLinkService,
+        findController: pdfFindController,
+        removePageBorders: true,
+        imageResourcesPath: `${base}/legacy/web/images/`
+    });
+
+    pdfLinkService.setViewer(pdfViewer);
+    pdfLinkService.setHistory(pdfHistory);
+
+    let pdfDoc = null;
+    let viewerReady = false;
+    let positionKey = "";
+
+    // ---------- מצב גלילה ----------
+
+    const isContinuous = () => pdfViewer.scrollMode === ScrollMode.VERTICAL;
+
+    function updateScrollModeControls() {
+        const label = isContinuous() ? "עמוד בודד" : "גלילה רציפה";
+        viewerElement.classList.toggle("continuous", isContinuous());
+        scrollModeLabel.textContent = label;
+        scrollModeButton.title = label;
+        scrollModeButton.setAttribute("aria-label", label);
+    }
+
+    eventBus.on("scrollmodechanged", updateScrollModeControls);
+
+    scrollModeButton.addEventListener("click", () => {
+        const continuous = !isContinuous();
+        pdfViewer.scrollMode = continuous ? ScrollMode.VERTICAL : ScrollMode.PAGE;
+        store.set("pdfviewer:continuous", continuous ? "1" : "0");
+    });
+
+    // ---------- אתחול התצוגה ----------
+
+    eventBus.on("pagesinit", () => {
+        const saved = store.get("pdfviewer:continuous");
+        const continuous = saved === null ? START_CONTINUOUS : saved === "1";
+        pdfViewer.scrollMode = continuous ? ScrollMode.VERTICAL : ScrollMode.PAGE;
+        updateScrollModeControls();   // המצב ההתחלתי של הספרייה לא מפעיל אירוע שינוי
+        pdfViewer.currentScaleValue = DEFAULT_ZOOM;
+
+        // סדר עדיפויות: היסטוריה או קישור ישיר (#page=5), ואחר כך העמוד שבו הקורא עצר
+        const bookmark = pdfHistory.initialBookmark || location.hash.slice(1);
+        const savedPage = Number(store.get(positionKey));
+        if (bookmark) {
+            pdfLinkService.setHash(bookmark);
+        } else if (savedPage > 1 && savedPage <= pdfViewer.pagesCount) {
+            pdfViewer.currentPageNumber = savedPage;
+        }
+
+        for (const control of [pageInput, zoomSelect, scrollModeButton, searchInput]) {
+            control.disabled = false;
+        }
+        viewerReady = true;
+        updatePageControls(pdfViewer.currentPageNumber);
+        updateZoomControls(pdfViewer.currentScale, pdfViewer.currentScaleValue);
+        container.focus({ preventScroll: true });
+    });
+
+    eventBus.on("pagerendered", () => {
+        message.hidden = true;
+    }, { once: true });
+
+    // ---------- ניווט בין עמודים ----------
+
+    function updatePageControls(pageNumber) {
+        pageInput.value = pageNumber;
+        prevButton.disabled = pageNumber <= 1;
+        nextButton.disabled = pageNumber >= pdfViewer.pagesCount;
+    }
+
+    eventBus.on("pagechanging", ({ pageNumber }) => {
+        updatePageControls(pageNumber);
+        if (positionKey) {
+            store.set(positionKey, pageNumber);
+        }
+    });
+
+    prevButton.addEventListener("click", () => pdfViewer.previousPage());
+    nextButton.addEventListener("click", () => pdfViewer.nextPage());
+
+    // אחרי לחיצת עכבר החצים למעלה ולמטה ימשיכו לגלול את העמוד. בהפעלה מהמקלדת המיקוד נשאר בכפתור.
+    $("controls").addEventListener("click", (event) => {
+        if (event.detail > 0 && event.target.closest("button:not(.search-btn)")) {
+            container.focus({ preventScroll: true });
+        }
+    });
+
+    pageInput.addEventListener("focus", () => pageInput.select());
+
+    pageInput.addEventListener("change", () => {
+        const pageNumber = Number(pageInput.value);
+        if (Number.isInteger(pageNumber) && pageNumber >= 1 && pageNumber <= pdfViewer.pagesCount) {
+            pdfLinkService.goToPage(pageNumber);
+        }
+        pageInput.value = pdfViewer.currentPageNumber;
+    });
+
+    pageInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            container.focus({ preventScroll: true });
+        }
+    });
+
+    // ---------- זום ----------
+
+    // הספרייה מחשבת את נקודת העיגון יחסית לאזור התצוגה, ולא לחלון כולו
+    function viewerPoint(x, y) {
+        const rect = area.getBoundingClientRect();
+        return [x - rect.left, y - rect.top];
+    }
+
+    function zoomTo(scale, origin, drawingDelay) {
+        const current = pdfViewer.currentScale;
+        const target = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
+        if (Math.abs(target - current) >= 0.005) {
+            pdfViewer.updateScale({ scaleFactor: target / current, origin, drawingDelay });
+        }
+    }
+
+    const zoomBy = (factor, origin, drawingDelay) =>
+        zoomTo(pdfViewer.currentScale * factor, origin, drawingDelay);
+
+    function updateZoomControls(scale, presetValue) {
+        zoomInButton.disabled = scale >= MAX_ZOOM - 0.005;
+        zoomOutButton.disabled = scale <= MIN_ZOOM + 0.005;
+
+        const option = [...zoomSelect.options].find((item) =>
+            item.value === presetValue || Math.abs(Number(item.value) - scale) < 0.005);
+        if (option) {
+            zoomCustom.hidden = true;
+            zoomSelect.value = option.value;
+        } else {
+            zoomCustom.textContent = `${Math.round(scale * 100)}%`;
+            zoomCustom.hidden = false;
+            zoomSelect.value = "custom";
+        }
+    }
+
+    eventBus.on("scalechanging", ({ scale, presetValue }) => {
+        updateZoomControls(scale, presetValue);
+    });
+
+    zoomInButton.addEventListener("click", () => zoomBy(ZOOM_STEP));
+    zoomOutButton.addEventListener("click", () => zoomBy(1 / ZOOM_STEP));
+
+    zoomSelect.addEventListener("change", () => {
+        pdfViewer.currentScaleValue = zoomSelect.value;
+        container.focus({ preventScroll: true });
+    });
+
+    // Ctrl + גלגלת, וגם צביטה במשטח מגע של מחשב נייד
+    let pendingWheelZoom = 1;
+    container.addEventListener("wheel", (event) => {
+        if (!event.ctrlKey && !event.metaKey) {
+            return;
+        }
+        event.preventDefault();
+        // נקישת גלגלת שווה צעד זום אחד, ותנועות קטנות של משטח מגע מצטברות
+        const delta = event.deltaY * ([1, 16, 100][event.deltaMode] ?? 1);
+        pendingWheelZoom *= Math.min(ZOOM_STEP, Math.max(1 / ZOOM_STEP, Math.exp(-delta / 100)));
+        if (Math.abs(pendingWheelZoom - 1) >= 0.02) {
+            zoomBy(pendingWheelZoom, viewerPoint(event.clientX, event.clientY), REDRAW_DELAY);
+            pendingWheelZoom = 1;
+        }
+    }, { passive: false });
+
+    // צביטה בשתי אצבעות במסך מגע. הזום נמדד מתחילת המחווה, כדי שהעמוד יעקוב במדויק אחרי האצבעות.
+    let pinch = null;
+
+    function readPinch(touches) {
+        const a = touches[0];
+        const b = touches[1];
+        return {
+            distance: Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY),
+            center: viewerPoint((a.clientX + b.clientX) / 2, (a.clientY + b.clientY) / 2)
+        };
+    }
+
+    container.addEventListener("touchstart", (event) => {
+        pinch = event.touches.length === 2
+            ? { distance: readPinch(event.touches).distance, scale: pdfViewer.currentScale }
+            : null;
+    }, { passive: true });
+
+    container.addEventListener("touchmove", (event) => {
+        if (!pinch || event.touches.length !== 2) {
+            return;
+        }
+        event.preventDefault();
+        const { distance, center } = readPinch(event.touches);
+        zoomTo(pinch.scale * distance / pinch.distance, center, REDRAW_DELAY);
+    }, { passive: false });
+
+    const endPinch = () => {
+        pinch = null;
+    };
+    container.addEventListener("touchend", endPinch, { passive: true });
+    container.addEventListener("touchcancel", endPinch, { passive: true });
+
+    // התאמה מחדש בשינוי גודל חלון או בסיבוב הטלפון
+    let resizeFrame = 0;
+    new ResizeObserver(() => {
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = requestAnimationFrame(() => {
+            if (!viewerReady) {
+                return;
+            }
+            const scaleValue = pdfViewer.currentScaleValue;
+            if (["auto", "page-width", "page-fit"].includes(scaleValue)) {
+                pdfViewer.currentScaleValue = scaleValue;
+            }
+            pdfViewer.update();
+        });
+    }).observe(container);
+
+    // ---------- חיפוש ----------
+
+    function dispatchSearch(type, findPrevious = false) {
+        const query = searchInput.value.trim();
+        searchPrevButton.disabled = !query;
+        searchNextButton.disabled = !query;
+
+        if (!query) {
+            eventBus.dispatch("findbarclose", { source: searchInput });
+            searchStatus.textContent = "";
+            searchBox.classList.remove("not-found");
+            return;
+        }
+
+        eventBus.dispatch("find", {
+            source: searchInput,
+            type,
+            query,
+            caseSensitive: false,
+            entireWord: false,
+            highlightAll: true,
+            findPrevious,
+            matchDiacritics: false   // חיפוש בעברית יתעלם מניקוד
+        });
+    }
+
+    function showMatches({ current, total }) {
+        if (searchInput.value.trim() && total > 0) {
+            searchStatus.textContent = `${current} מתוך ${total}`;
+        }
+    }
+
+    eventBus.on("updatefindmatchescount", ({ matchesCount }) => showMatches(matchesCount));
+
+    eventBus.on("updatefindcontrolstate", ({ state, matchesCount }) => {
+        if (!searchInput.value.trim()) {
+            return;
+        }
+        searchBox.classList.toggle("not-found", state === FindState.NOT_FOUND);
+        if (state === FindState.NOT_FOUND) {
+            searchStatus.textContent = "אין תוצאות";
+        } else if (state === FindState.PENDING) {
+            searchStatus.textContent = "מחפש...";
+        } else {
+            showMatches(matchesCount);
+        }
+    });
+
+    // הספרייה ממתינה בעצמה לסיום ההקלדה, ולכן אין צורך במנגנון השהיה נוסף
+    searchInput.addEventListener("input", () => dispatchSearch(""));
+    searchNextButton.addEventListener("click", () => dispatchSearch("again"));
+    searchPrevButton.addEventListener("click", () => dispatchSearch("again", true));
+
+    searchInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            dispatchSearch("again", event.shiftKey);
+        }
+    });
+
+    function clearSearch() {
+        searchInput.value = "";
+        dispatchSearch("");
+        container.focus({ preventScroll: true });
+    }
+
+    // ---------- תוכן עניינים ----------
+
+    function setOutlineOpen(open) {
+        outlinePanel.hidden = !open;
+        outlineToggle.setAttribute("aria-expanded", String(open));
+    }
+
+    function buildOutlineList(items) {
+        const list = document.createElement("ul");
+        for (const item of items) {
+            const entry = document.createElement("li");
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = item.title;
+            button.addEventListener("click", () => {
+                if (item.dest) {
+                    pdfLinkService.goToDestination(item.dest);
+                } else if (item.url) {
+                    window.open(item.url, "_blank", "noopener,noreferrer");
+                }
+                if (matchMedia("(max-width: 640px), (max-height: 500px)").matches) {
+                    setOutlineOpen(false);
+                }
+            });
+            entry.append(button);
+            if (item.items?.length) {
+                entry.append(buildOutlineList(item.items));
+            }
+            list.append(entry);
+        }
+        return list;
+    }
+
+    async function loadOutline() {
+        const outline = await pdfDoc.getOutline();
+        if (outline?.length) {
+            // dir="auto" - כיוון השורות וההזחה יתאימו לשפת המאמר, לא לממשק
+            const list = buildOutlineList(outline);
+            list.dir = "auto";
+            outlinePanel.replaceChildren(list);
+            outlineToggle.hidden = false;
+        }
+    }
+
+    outlineToggle.addEventListener("click", () => setOutlineOpen(outlinePanel.hidden));
+
+    // ---------- קיצורי מקלדת ----------
+
+    // בעמוד בודד, בקצה העמוד עוברים לעמוד הסמוך. אחרת גוללים כמעט מסך שלם.
+    function scrollByScreen(direction) {
+        const atEnd = direction > 0
+            ? container.scrollTop + container.clientHeight >= container.scrollHeight - 2
+            : container.scrollTop <= 2;
+
+        if (atEnd && !isContinuous()) {
+            if (direction > 0) {
+                pdfViewer.nextPage();
+            } else {
+                pdfViewer.previousPage();
+            }
+        } else {
+            container.scrollBy({ top: direction * container.clientHeight * 0.9 });
+        }
+    }
+
+    window.addEventListener("keydown", (event) => {
+        if (!viewerReady) {
+            return;
+        }
+
+        const modifier = event.ctrlKey || event.metaKey;
+        const key = event.key.toLowerCase();
+
+        if (modifier && !event.altKey) {
+            let handled = true;
+            if (key === "f" && !event.shiftKey) {
+                searchInput.focus();
+                searchInput.select();
+            } else if (key === "=" || key === "+") {
+                zoomBy(ZOOM_STEP);
+            } else if (key === "-") {
+                zoomBy(1 / ZOOM_STEP);
+            } else if (key === "0") {
+                pdfViewer.currentScaleValue = DEFAULT_ZOOM;
+            } else {
+                handled = false;
+            }
+            if (handled) {
+                event.preventDefault();
+            }
+            return;
+        }
+
+        if (event.key === "Escape") {
+            if (!outlinePanel.hidden) {
+                setOutlineOpen(false);
+                outlineToggle.focus();
+            } else if (searchInput.value) {
+                clearSearch();
+            }
+            return;
+        }
+
+        // מקשים כמו Alt+חץ שייכים לדפדפן, ובשדות טקסט המקשים שייכים להקלדה
+        if (modifier || event.altKey || event.target.closest("input, select, #outline-panel")) {
+            return;
+        }
+
+        switch (event.key) {
+            case "ArrowLeft":
+            case "ArrowRight":
+                // כשהעמוד רחב מהמסך, החצים ממשיכים לגלול אופקית
+                if (!pdfViewer.isHorizontalScrollbarEnabled) {
+                    event.preventDefault();
+                    if (event.key === "ArrowRight") {
+                        pdfViewer.nextPage();
+                    } else {
+                        pdfViewer.previousPage();
+                    }
+                }
+                break;
+            case "PageDown":
+            case "PageUp":
+                event.preventDefault();
+                scrollByScreen(event.key === "PageDown" ? 1 : -1);
+                break;
+            case " ":
+                if (!event.target.closest("button, a")) {
+                    event.preventDefault();
+                    scrollByScreen(event.shiftKey ? -1 : 1);
+                }
+                break;
+            case "Home":
+                event.preventDefault();
+                pdfViewer.currentPageNumber = 1;
+                break;
+            case "End":
+                event.preventDefault();
+                pdfViewer.currentPageNumber = pdfViewer.pagesCount;
+                break;
+        }
+    });
+
+    // קישור ישיר שהודבק בכתובת כשהמציג כבר פתוח
+    window.addEventListener("hashchange", () => {
+        if (viewerReady && !pdfHistory.popStateInProgress) {
+            pdfLinkService.setHash(location.hash.slice(1));
+        }
+    });
+
+    // ---------- טעינת המאמר ----------
+
+    // disableStream ו-disableAutoFetch: מורידים רק את החלקים שנדרשים לעמודים שמוצגים,
+    // ולא את הקובץ כולו ברקע. שרת שלא תומך ב-Range ישלח בכל זאת את הקובץ המלא.
+    const loadingTask = pdfjsLib.getDocument({
+        url: PDF_URL,
+        disableStream: true,
+        disableAutoFetch: true,
+        cMapUrl: `${base}/cmaps/`,
+        cMapPacked: true,
+        standardFontDataUrl: `${base}/standard_fonts/`,
+        wasmUrl: `${base}/wasm/`,
+        iccUrl: `${base}/iccs/`,
+        enableHWA: true
+    });
+
+    loadingTask.onProgress = ({ loaded, total }) => {
+        if (total > 0) {
+            const percent = Math.min(100, Math.round(loaded / total * 100));
+            loadProgress.value = percent / 100;
+            messageText.textContent = `טוען את המאמר... ${percent}%`;
+        }
+    };
+
+    pdfDoc = await loadingTask.promise;
+    positionKey = `pdfviewer:page:${pdfDoc.fingerprints[0]}`;
+
+    totalPagesText.textContent = pdfDoc.numPages;
+    pdfViewer.setDocument(pdfDoc);
+    pdfLinkService.setDocument(pdfDoc, null);
+    pdfHistory.initialize({ fingerprint: pdfDoc.fingerprints[0], updateUrl: true });
+
+    // תוספות שכישלונן לא משפיע על קריאת המאמר
+    loadOutline().catch(console.warn);
+    pdfDoc.getMetadata().then(({ info }) => {
+        const title = info?.Title?.trim();
+        if (title) {
+            document.title = `${title} | מציג מאמר אקדמי`;
+        }
+    }).catch(console.warn);
+}
+
+main().catch((error) => {
+    console.error(error);
+    showError(describeError(error));
+});
+
+</script>
+</body>
+</html>
